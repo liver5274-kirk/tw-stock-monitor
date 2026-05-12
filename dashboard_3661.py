@@ -64,6 +64,70 @@ def load_csv():
     return df, path
 
 
+def detect_smoke_events(df):
+    """掃描整個 DataFrame，回傳煙霧彈事件列表。
+    每個事件: {time, price, signal, label, color}
+    """
+    events = []
+    if len(df) < 2:
+        return events
+
+    rows = df.to_dict("records")
+
+    for i in range(1, len(rows)):
+        prev = rows[i - 1]
+        curr = rows[i]
+
+        prev_ask = prev.get("ask_total_vol", 0) or 0
+        curr_ask = curr.get("ask_total_vol", 0) or 0
+        prev_vol = prev.get("volume", 0) or 0
+        curr_vol = curr.get("volume", 0) or 0
+        prev_price = prev.get("price")
+        curr_price = curr.get("price")
+        ratio = curr.get("bid_ask_ratio", 0) or 0
+        day_high = df["high"].max() if "high" in df.columns else 0
+
+        t = curr.get("time")
+
+        # 訊號 1: 賣盤暴增 + 價格不跌
+        if prev_ask > 0 and curr_ask >= prev_ask * 1.5 and curr_ask >= 15:
+            price_dropped = (
+                prev_price and curr_price and prev_price > 0 and curr_price > 0
+                and curr_price < prev_price
+            )
+            if not price_dropped:
+                events.append({
+                    "time": t, "price": curr_price,
+                    "signal": "假賣壓",
+                    "label": f"🔥 ask {int(prev_ask)}→{int(curr_ask)}",
+                    "color": "#f59e0b",  # amber
+                })
+
+        # 訊號 2: 賣盤瞬間蒸發（抽單）
+        drop = prev_ask - curr_ask
+        if drop >= 15:
+            vol_delta = curr_vol - prev_vol
+            if vol_delta < drop * 0.5:
+                events.append({
+                    "time": t, "price": curr_price,
+                    "signal": "抽單",
+                    "label": f"🚨 -{int(drop)}張",
+                    "color": "#ef4444",  # red
+                })
+
+        # 訊號 3: 買賣比極空 + 價格近高點
+        if 0 < ratio < 0.3 and curr_ask >= 15 and day_high > 0 and curr_price:
+            if curr_price >= day_high * 0.98:
+                events.append({
+                    "time": t, "price": curr_price,
+                    "signal": "背離",
+                    "label": f"⚠ ratio={ratio:.2f}",
+                    "color": "#8b5cf6",  # purple
+                })
+
+    return events
+
+
 # ── 頁面設定 ──
 st.set_page_config(
     page_title=f"{STOCK_ID} {STOCK_NAME} Dashboard",
@@ -125,6 +189,9 @@ if ratio and not pd.isna(ratio):
 # ── 主圖：價格 + 成交量 ──
 st.subheader("價格走勢")
 
+# 掃描煙霧彈事件
+smoke_events = detect_smoke_events(df)
+
 fig1 = make_subplots(
     rows=2, cols=1,
     shared_xaxes=True,
@@ -143,6 +210,30 @@ fig1.add_trace(
     ),
     row=1, col=1,
 )
+
+# 煙霧彈標記 — 依訊號類型分色
+for sig_color, sig_name in [("#f59e0b", "假賣壓"), ("#ef4444", "抽單"), ("#8b5cf6", "背離")]:
+    sig_events = [e for e in smoke_events if e["signal"] == sig_name]
+    if sig_events:
+        fig1.add_trace(
+            go.Scatter(
+                x=[e["time"] for e in sig_events],
+                y=[e["price"] for e in sig_events],
+                mode="markers+text",
+                name=sig_name,
+                marker=dict(
+                    symbol="diamond",
+                    size=14,
+                    color=sig_color,
+                    line=dict(width=1, color="white"),
+                ),
+                text=[e["label"] for e in sig_events],
+                textposition="top center",
+                textfont=dict(size=9),
+                hovertemplate="%{text}<br>價格: %{y:.0f}<extra></extra>",
+            ),
+            row=1, col=1,
+        )
 
 # 日高日低參考線
 if day_high and not pd.isna(day_high):
@@ -266,6 +357,28 @@ fig4.update_layout(
 )
 
 st.plotly_chart(fig4, use_container_width=True)
+
+# ── 煙霧彈事件摘要 ──
+if smoke_events:
+    st.subheader(f"🕵️ 煙霧彈事件 ({len(smoke_events)} 次)")
+    cols = st.columns([1, 1, 1, 2])
+    cols[0].markdown("**時間**")
+    cols[1].markdown("**訊號**")
+    cols[2].markdown("**價格**")
+    cols[3].markdown("**說明**")
+    for e in smoke_events[-20:]:  # 顯示最近 20 筆
+        t_str = e["time"].strftime("%H:%M:%S") if hasattr(e["time"], "strftime") else str(e["time"])
+        p_str = f"{e['price']:.0f}" if e["price"] and not pd.isna(e["price"]) else "-"
+        emoji = {"假賣壓": "🔥", "抽單": "🚨", "背離": "⚠"}.get(e["signal"], "")
+        cols2 = st.columns([1, 1, 1, 2])
+        cols2[0].code(t_str)
+        cols2[1].markdown(f"{emoji} **{e['signal']}**")
+        cols2[2].code(p_str)
+        cols2[3].caption(e["label"])
+    if len(smoke_events) > 20:
+        st.caption(f"... 及其他 {len(smoke_events) - 20} 筆事件")
+else:
+    st.info("🟢 今日無煙霧彈事件")
 
 # ── 底部資訊 ──
 st.caption(f"資料來源: `{csv_path}` | 更新時間: {datetime.now().strftime('%H:%M:%S')} | 自動刷新: {'🟢 開啟' if is_trading_time() else '⏸ 已暫停（非交易時間）'}")
