@@ -408,6 +408,69 @@ fig4.update_yaxes(gridcolor=chart_grid)
 
 st.plotly_chart(fig4, use_container_width=True)
 
+# ── 價差走勢圖 ──
+st.subheader("買賣價差走勢")
+
+# 計算價差百分比
+df_spread = df[df["spread"].notna() & (df["spread"] > 0)].copy()
+if not df_spread.empty:
+    df_spread["spread_pct"] = df_spread["spread"] / df_spread["price"] * 100
+
+fig_spread = make_subplots(
+    rows=2, cols=1,
+    shared_xaxes=True,
+    vertical_spacing=0.08,
+    row_heights=[0.5, 0.5],
+)
+
+fig_spread.add_trace(
+    go.Scatter(
+        x=df_spread["time"], y=df_spread["spread"],
+        mode="lines",
+        name="價差 (元)",
+        line=dict(color="#f59e0b", width=2),
+        fill="tozeroy", fillcolor="rgba(245,158,11,0.1)",
+    ),
+    row=1, col=1,
+)
+fig_spread.add_trace(
+    go.Scatter(
+        x=df_spread["time"], y=df_spread["spread_pct"],
+        mode="lines",
+        name="價差 (%)",
+        line=dict(color="#ef4444", width=2),
+        fill="tozeroy", fillcolor="rgba(239,68,68,0.1)",
+    ),
+    row=2, col=1,
+)
+# 參考線: 0.5% 價差 = 流動性警戒
+fig_spread.add_hline(y=0.5, line_dash="dot", line_color="#f59e0b",
+                     annotation_text="警戒 0.5%", row=2, col=1)
+
+fig_spread.update_layout(
+    height=350, hovermode="x unified",
+    showlegend=False,
+    margin=dict(l=0, r=0, t=10, b=0),
+    template=plotly_template,
+    paper_bgcolor=chart_bg, plot_bgcolor=chart_bg,
+    font_color=chart_font,
+)
+fig_spread.update_yaxes(title_text="價差 (元)", row=1, col=1, gridcolor=chart_grid)
+fig_spread.update_yaxes(title_text="價差 (%)", row=2, col=1, gridcolor=chart_grid)
+fig_spread.update_xaxes(gridcolor=chart_grid)
+
+st.plotly_chart(fig_spread, use_container_width=True)
+
+# 流動性判斷
+if not df_spread.empty:
+    avg_spread_pct = df_spread["spread_pct"].mean()
+    if avg_spread_pct < 0.3:
+        st.success(f"🟢 流動性佳 — 日均價差 {avg_spread_pct:.2f}% (<0.3%)")
+    elif avg_spread_pct < 0.5:
+        st.info(f"🟡 流動性正常 — 日均價差 {avg_spread_pct:.2f}%")
+    else:
+        st.warning(f"🟠 流動性偏弱 — 日均價差 {avg_spread_pct:.2f}% (>0.5%)")
+
 # ── 煙霧彈事件摘要 ──
 if smoke_events:
     st.subheader(f"🕵️ 煙霧彈事件 ({len(smoke_events)} 次)")
