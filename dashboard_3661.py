@@ -471,6 +471,100 @@ if not df_spread.empty:
     else:
         st.warning(f"🟠 流動性偏弱 — 日均價差 {avg_spread_pct:.2f}% (>0.5%)")
 
+# ── Delta 動量圖（大單進場偵測）──
+st.subheader("⚡ 掛單動量 (大單進場訊號)")
+
+DELTA_THRESH = 100  # 掛單驟變閾值
+
+# 擷取 Delta 大單事件
+big_bids = df[df["bid1_vol_delta"] >= DELTA_THRESH].copy()
+big_asks = df[df["ask1_vol_delta"] >= DELTA_THRESH].copy()
+
+fig_delta = make_subplots(
+    rows=2, cols=1,
+    shared_xaxes=True,
+    vertical_spacing=0.05,
+    row_heights=[0.5, 0.5],
+)
+
+# 買盤 Delta
+fig_delta.add_trace(
+    go.Bar(
+        x=df["time"], y=df["bid1_vol_delta"],
+        name="買盤 Δ",
+        marker_color="#22c55e",
+        opacity=0.6,
+    ),
+    row=1, col=1,
+)
+# 大單標記
+if not big_bids.empty:
+    fig_delta.add_trace(
+        go.Scatter(
+            x=big_bids["time"], y=big_bids["bid1_vol_delta"],
+            mode="markers+text",
+            name="大買單",
+            marker=dict(symbol="triangle-up", size=12, color="#22c55e",
+                        line=dict(width=1, color="white")),
+            text=[f"+{int(v)}" for v in big_bids["bid1_vol_delta"]],
+            textposition="top center",
+            textfont=dict(size=9, color="#22c55e"),
+            hovertemplate="大買單 +%{y}<extra></extra>",
+        ),
+        row=1, col=1,
+    )
+
+# 賣盤 Delta
+fig_delta.add_trace(
+    go.Bar(
+        x=df["time"], y=df["ask1_vol_delta"],
+        name="賣盤 Δ",
+        marker_color="#ef4444",
+        opacity=0.6,
+    ),
+    row=2, col=1,
+)
+if not big_asks.empty:
+    fig_delta.add_trace(
+        go.Scatter(
+            x=big_asks["time"], y=big_asks["ask1_vol_delta"],
+            mode="markers+text",
+            name="大賣單",
+            marker=dict(symbol="triangle-down", size=12, color="#ef4444",
+                        line=dict(width=1, color="white")),
+            text=[f"+{int(v)}" for v in big_asks["ask1_vol_delta"]],
+            textposition="bottom center",
+            textfont=dict(size=9, color="#ef4444"),
+            hovertemplate="大賣單 +%{y}<extra></extra>",
+        ),
+        row=2, col=1,
+    )
+
+fig_delta.update_layout(
+    height=350, hovermode="x unified",
+    showlegend=False,
+    margin=dict(l=0, r=0, t=10, b=0),
+    barmode="overlay",
+    template=plotly_template,
+    paper_bgcolor=chart_bg, plot_bgcolor=chart_bg,
+    font_color=chart_font,
+)
+fig_delta.update_yaxes(title_text="買盤 Δ (張)", row=1, col=1, gridcolor=chart_grid)
+fig_delta.update_yaxes(title_text="賣盤 Δ (張)", row=2, col=1, gridcolor=chart_grid)
+fig_delta.update_xaxes(gridcolor=chart_grid)
+
+st.plotly_chart(fig_delta, use_container_width=True)
+
+# 大單摘要
+total_big = len(big_bids) + len(big_asks)
+if total_big > 0:
+    st.info(
+        f"🔍 今日偵測到 **{len(big_bids)}** 次大買單 + **{len(big_asks)}** 次大賣單 "
+        f"(Δ ≥ {DELTA_THRESH} 張)"
+    )
+else:
+    st.caption(f"今日尚無掛單驟變 > {DELTA_THRESH} 張")
+
 # ── 煙霧彈事件摘要 ──
 if smoke_events:
     st.subheader(f"🕵️ 煙霧彈事件 ({len(smoke_events)} 次)")
