@@ -135,6 +135,37 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── 暗黑模式切換 ──
+DARK_CSS = """
+<style>
+    .stApp { background-color: #0f172a; }
+    .stMarkdown, .stMetric label, .stCaption, .stSubheader, h1, h2, h3, h4 {
+        color: #e2e8f0 !important;
+    }
+    .stMetric { background: #1e293b; border-radius: 8px; padding: 10px; }
+    .stAlert { background: #1e293b !important; border: 1px solid #334155; }
+    div[data-testid="stMetricValue"] { color: #f1f5f9 !important; }
+    div[data-testid="stMetricDelta"] { }
+    /* 程式碼區塊 */
+    .stCodeBlock, code { background: #1e293b !important; color: #94a3b8 !important; }
+    /* 側邊欄 */
+    section[data-testid="stSidebar"] { background: #0c1222; }
+    section[data-testid="stSidebar"] *, section[data-testid="stSidebar"] label {
+        color: #cbd5e1 !important;
+    }
+</style>
+"""
+
+theme = st.sidebar.radio("🎨 主題", ["🌞 明亮", "🌙 暗黑"], index=0, horizontal=True)
+is_dark = (theme == "🌙 暗黑")
+if is_dark:
+    st.markdown(DARK_CSS, unsafe_allow_html=True)
+
+plotly_template = "plotly_dark" if is_dark else "plotly"
+chart_bg = "#1e293b" if is_dark else "white"
+chart_grid = "#334155" if is_dark else "#e2e8f0"
+chart_font = "#cbd5e1" if is_dark else "#1e293b"
+
 # 自動刷新
 if is_trading_time():
     st.markdown(
@@ -257,9 +288,13 @@ fig1.update_layout(
     height=500, hovermode="x unified",
     showlegend=False,
     margin=dict(l=0, r=0, t=10, b=0),
+    template=plotly_template,
+    paper_bgcolor=chart_bg, plot_bgcolor=chart_bg,
+    font_color=chart_font,
 )
-fig1.update_yaxes(title_text="價格", row=1, col=1)
-fig1.update_yaxes(title_text="量", row=2, col=1)
+fig1.update_yaxes(title_text="價格", row=1, col=1, gridcolor=chart_grid)
+fig1.update_yaxes(title_text="量", row=2, col=1, gridcolor=chart_grid)
+fig1.update_xaxes(gridcolor=chart_grid)
 
 st.plotly_chart(fig1, use_container_width=True)
 
@@ -284,7 +319,12 @@ with col_left:
         height=350, hovermode="x unified",
         margin=dict(l=0, r=0, t=10, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        template=plotly_template,
+        paper_bgcolor=chart_bg, plot_bgcolor=chart_bg,
+        font_color=chart_font,
     )
+    fig2.update_xaxes(gridcolor=chart_grid)
+    fig2.update_yaxes(gridcolor=chart_grid)
     st.plotly_chart(fig2, use_container_width=True)
 
 with col_right:
@@ -308,7 +348,12 @@ with col_right:
         height=350, hovermode="x unified",
         margin=dict(l=0, r=0, t=10, b=0),
         showlegend=False,
+        template=plotly_template,
+        paper_bgcolor=chart_bg, plot_bgcolor=chart_bg,
+        font_color=chart_font,
     )
+    fig3.update_xaxes(gridcolor=chart_grid)
+    fig3.update_yaxes(gridcolor=chart_grid)
     st.plotly_chart(fig3, use_container_width=True)
 
 # ── 五檔深度圖 ──
@@ -354,7 +399,12 @@ fig4.update_layout(
     margin=dict(l=0, r=0, t=10, b=0),
     xaxis_title="← 賣盤掛量  │  買盤掛量 →",
     showlegend=False,
+    template=plotly_template,
+    paper_bgcolor=chart_bg, plot_bgcolor=chart_bg,
+    font_color=chart_font,
 )
+fig4.update_xaxes(gridcolor=chart_grid)
+fig4.update_yaxes(gridcolor=chart_grid)
 
 st.plotly_chart(fig4, use_container_width=True)
 
