@@ -298,6 +298,65 @@ fig1.update_xaxes(gridcolor=chart_grid)
 
 st.plotly_chart(fig1, use_container_width=True)
 
+# ── 多日對比疊圖 ──
+with st.expander("📆 多日走勢對比", expanded=False):
+    # 找最近 N 天的 CSV
+    all_files = sorted(glob.glob(os.path.join(CSV_DIR, f"*_{STOCK_ID}.csv")), reverse=True)
+    all_files = [f for f in all_files if os.path.basename(f) != os.path.basename(csv_path)]
+    all_files = [csv_path] + all_files  # 今日排第一
+
+    num_days = st.selectbox("顯示天數", [2, 3, 5, 10], index=1)
+    files_to_show = all_files[:num_days]
+
+    fig_multi = go.Figure()
+    colors = ["#3b82f6", "#f59e0b", "#8b5cf6", "#ec4899", "#10b981",
+              "#ef4444", "#06b6d4", "#f97316", "#84cc16", "#6366f1"]
+
+    for i, fpath in enumerate(files_to_show):
+        try:
+            df_day = pd.read_csv(fpath, encoding="utf-8-sig")
+            # 只取 time + price
+            if "time" not in df_day.columns or "price" not in df_day.columns:
+                continue
+            df_day["price"] = pd.to_numeric(df_day["price"], errors="coerce")
+            df_day = df_day[df_day["price"].notna() & (df_day["price"] > 0)]
+
+            if df_day.empty:
+                continue
+
+            date_label = os.path.basename(fpath)[:8]  # YYYYMMDD
+            try:
+                date_label = f"{date_label[:4]}-{date_label[4:6]}-{date_label[6:8]}"
+            except Exception:
+                pass
+
+            color = colors[i % len(colors)]
+            opacity = 1.0 if i == 0 else 0.5
+
+            fig_multi.add_trace(go.Scatter(
+                x=df_day["time"], y=df_day["price"],
+                mode="lines",
+                name=date_label,
+                line=dict(color=color, width=2 if i == 0 else 1.5),
+                opacity=opacity,
+                hovertemplate=f"{date_label}<br>%{{y:.0f}}<extra></extra>",
+            ))
+        except Exception:
+            continue
+
+    fig_multi.update_layout(
+        height=400, hovermode="x unified",
+        margin=dict(l=0, r=0, t=10, b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        template=plotly_template,
+        paper_bgcolor=chart_bg, plot_bgcolor=chart_bg,
+        font_color=chart_font,
+    )
+    fig_multi.update_xaxes(gridcolor=chart_grid)
+    fig_multi.update_yaxes(title_text="價格", gridcolor=chart_grid)
+
+    st.plotly_chart(fig_multi, use_container_width=True)
+
 # ── 買賣力道圖 ──
 col_left, col_right = st.columns(2)
 
