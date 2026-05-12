@@ -1,0 +1,29 @@
+name: 3661 煙霧彈偵測
+
+on:
+  schedule:
+    # 每 5 分鐘，週一至週五 9:00-13:30 CST (1:00-5:30 UTC)
+    - cron: '*/5 1-5 * * 1-5'
+  workflow_dispatch:  # 手動觸發
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install twstock
+
+      - name: Run smoke detector
+        working-directory: scripts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python smoke_detect_3661.py
