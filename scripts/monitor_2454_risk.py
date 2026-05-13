@@ -67,7 +67,7 @@ MIN_RANGE_PCT = 1.5  # percent
 REBOUND_LOOKBACK = 10
 
 # Data staleness: ignore snapshots older than this (seconds)
-MAX_SNAPSHOT_AGE = 120  # 2 minutes
+MAX_SNAPSHOT_AGE = 900  # 15 minutes — must be > cron interval × MIN_SNAPSHOTS
 
 # ═══════════════════════════════════════════════
 # Time utilities
